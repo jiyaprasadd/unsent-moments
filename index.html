@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsent Moments</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,300;1,400&family=DM+Sans:wght@300;400;500;700&family=Lora:ital,wght@1,400;1,500&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Galaxy Palette */
+            --bg-color: #05050d;
+            --space-center: #0a0818;
+            --space-edge: #020208;
+            --star-white: #ffffff;
+            --star-cream: #fff8e7;
+            --star-blue: #c8d8ff;
+            --star-violet: #b89fe0;
+            --accent-violet: #7c4dff;
+            --accent-blush: #ff4d8f;
+            --text-primary: #ede8e0;
+            --text-secondary: #8a8a9a;
+            --surface-blur: rgba(10, 8, 24, 0.92);
+            
+            /* Old Palette variables kept for other pages */
+            --surface-color: #111118;
+            --accent-primary: #7c5cbf;
+            --accent-rose: #c47fa0;
+            --accent-gold: #c9a84c;
+            --glow-violet: rgba(124, 77, 255, 0.4);
+            
+            /* Fonts */
+            --font-display: 'Cormorant Garamond', serif;
+            --font-body: 'DM Sans', sans-serif;
+            --font-quote: 'Lora', serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            background: radial-gradient(circle at center, var(--space-center) 0%, var(--space-edge) 100%);
+            color: var(--text-primary);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            cursor: none; /* Hide default cursor */
+        }
+        
+        a, button, input, textarea, .nav-link, .cta-btn, .mood-tag {
+            cursor: none !important; /* Overwrite native cursors to keep custom cursor */
+        }
+
+        /* --- Custom Cursor --- */
+        #custom-cursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 10px; height: 10px;
+            background-color: var(--accent-violet);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            box-shadow: 0 0 12px var(--accent-violet), 0 0 24px rgba(124,77,255,0.4);
+            transform: translate(-50%, -50%);
+            transition: width 0.2s, height 0.2s, box-shadow 0.2s;
+            will-change: transform;
+        }
+        #custom-cursor.hover {
+            width: 20px; height: 20px;
+            box-shadow: 0 0 20px var(--accent-violet), 0 0 40px rgba(124,77,255,0.6);
+        }
+
+        /* --- Canvas Layer --- */
+        #galaxy-canvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: 0;
+            pointer-events: auto; /* It handles its own pointer events via JS attached to window */
+        }
+
+        /* --- Navigation --- */
+        nav {
+            position: fixed;
+            top: 0; left: 0; width: 100%;
+            padding: 2rem 4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            background: transparent;
+            transition: background 0.3s, border-bottom 0.3s, backdrop-filter 0.3s;
+            pointer-events: none; /* Let clicks pass through empty areas */
+        }
+        nav.scrolled {
+            background: rgba(10, 8, 24, 0.4);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .logo {
+            font-family: var(--font-display);
+            font-size: 18px;
+            letter-spacing: 0.15em;
+            color: var(--text-primary);
+            text-decoration: none;
+            pointer-events: auto;
+            transition: text-shadow 0.3s;
+        }
+        .logo:hover {
+            text-shadow: 0 0 8px rgba(124,77,255,0.6);
+        }
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            pointer-events: auto;
+        }
+        .nav-links a {
+            color: var(--text-secondary);
+            font-family: var(--font-body);
+            font-size: 13px;
+            text-decoration: none;
+            position: relative;
+            transition: color 0.3s, text-shadow 0.3s;
+        }
+        .nav-links a:hover, .nav-links a.active {
+            color: var(--text-primary);
+            text-shadow: 0 0 8px rgba(124,77,255,0.6);
+        }
+        
+        @media (max-width: 768px) {
+            nav { padding: 1.5rem; }
+            .nav-links { display: none; }
+        }
+
+        /* --- Main Layout --- */
+        main {
+            flex: 1;
+            position: relative;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            pointer-events: none; /* Crucial: allows canvas interaction */
+        }
+        .page {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            width: 100%;
+            pointer-events: auto; /* Pages intercept clicks */
+        }
+        .page.active {
+            display: block;
+        }
+        .page.visible {
+            opacity: 1;
+        }
+
+        /* --- Landing Page UI --- */
+        #landing {
+            min-height: 100vh;
+            position: relative;
+            pointer-events: none; /* Let canvas through */
+        }
+        
+        /* Hero Text */
+        .hero-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+        }
+        .hero-line {
+            font-family: var(--font-display);
+            font-size: 72px;
+            font-style: italic;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUpIn 1s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .hero-line:nth-child(2) { opacity: 0; color: rgba(237, 232, 224, 0.7); animation-delay: 0.3s; }
+        .hero-line:nth-child(3) { position: relative; animation-delay: 0.6s; }
+        
+        .hero-underline {
+            position: absolute;
+            bottom: 5px; left: 0;
+            height: 2px;
+            background-color: var(--accent-violet);
+            width: 0;
+            box-shadow: 0 0 10px var(--accent-violet);
+            animation: drawLine 1.2s cubic-bezier(0.22, 1, 0.36, 1) 1.2s forwards;
+        }
+        
+        .hero-tagline {
+            font-family: var(--font-body);
+            font-size: 14px;
+            color: var(--text-secondary);
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-top: 2rem;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeUpIn 1s cubic-bezier(0.22, 1, 0.36, 1) 0.9s forwards;
+        }
+
+        @keyframes fadeUpIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes drawLine {
+            to { width: 100%; }
+        }
+
+        @media (max-width: 768px) {
+            .hero-line { font-size: 40px; }
+            .hero-tagline { font-size: 11px; }
+        }
+
+        /* CTA Button */
+        .cta-container {
+            position: absolute;
+            bottom: 25%; left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            animation: fadeUpIn 1s cubic-bezier(0.22, 1, 0.36, 1) 1.5s forwards;
+            pointer-events: auto;
+        }
+        .cta-btn {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid rgba(124, 77, 255, 0.4);
+            padding: 14px 40px;
+            border-radius: 2px;
+            font-family: var(--font-body);
+            font-size: 13px;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            position: relative;
+            transition: all 0.4s ease;
+            outline: none;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .cta-btn:hover {
+            border-color: var(--accent-violet);
+            text-shadow: 0 0 10px var(--accent-violet);
+            box-shadow: inset 0 0 20px rgba(124, 77, 255, 0.1);
+        }
+        
+        .orbit-container {
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 1px; height: 1px;
+            pointer-events: none;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .cta-btn:hover .orbit-container { opacity: 1; }
+        .orbit-particle {
+            position: absolute;
+            top: -1px; left: -1px;
+            width: 2px; height: 2px;
+            background: var(--star-white);
+            border-radius: 50%;
+            box-shadow: 0 0 5px var(--star-white);
+            animation: orbitAnim 4s linear infinite;
+        }
+        .orbit-particle:nth-child(1) { animation-delay: 0s; }
+        .orbit-particle:nth-child(2) { animation-delay: -0.5s; }
+        .orbit-particle:nth-child(3) { animation-delay: -1s; }
+        .orbit-particle:nth-child(4) { animation-delay: -1.5s; }
+        .orbit-particle:nth-child(5) { animation-delay: -2s; }
+        .orbit-particle:nth-child(6) { animation-delay: -2.5s; }
+        .orbit-particle:nth-child(7) { animation-delay: -3s; }
+        .orbit-particle:nth-child(8) { animation-delay: -3.5s; }
+        
+        @keyframes orbitAnim {
+            0% { transform: rotate(0deg) translateX(110px) rotate(0deg); }
+            100% { transform: rotate(360deg) translateX(110px) rotate(-360deg); }
+        }
+
+        .orbit-ring {
+            position: absolute;
+            top: -10px; left: -10px; right: -10px; bottom: -10px;
+            border-radius: 6px;
+            pointer-events: none;
+            opacity: 0;
+        }
+        .cta-btn:hover .orbit-ring {
+            animation: rippleRing 1.5s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
+        @keyframes rippleRing {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(124, 77, 255, 0.5); opacity: 1; }
+            100% { transform: scale(1.1); box-shadow: 0 0 0 20px rgba(124, 77, 255, 0); opacity: 0; }
+        }
+
+        /* Scroll Hint */
+        .scroll-hint {
+            position: absolute;
+            bottom: 40px; left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            opacity: 0;
+            animation: fadeUpIn 1s cubic-bezier(0.22, 1, 0.36, 1) 2s forwards;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .scroll-hint.hidden { opacity: 0 !important; }
+        .chevron {
+            width: 14px; height: 14px;
+            border-right: 1px solid var(--text-secondary);
+            border-bottom: 1px solid var(--text-secondary);
+            transform: rotate(45deg);
+            animation: pulseHint 2s infinite;
+        }
+        .chevron:nth-child(2) { animation-delay: 0.2s; margin-top: -8px; }
+        .scroll-hint span {
+            font-family: var(--font-body);
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+        @keyframes pulseHint {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        /* Floating Mood Tags */
+        .mood-tags-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+        }
+        .mood-tag {
+            position: absolute;
+            background: rgba(255,255,255,0.05);
+            border: 0.5px solid rgba(255,255,255,0.15);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: var(--font-body);
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            pointer-events: auto;
+            transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+            animation: bobTag 4s ease-in-out infinite alternate;
+        }
+        .mood-tag:hover {
+            color: var(--text-primary);
+            background: rgba(255,255,255,0.1);
+            border-color: var(--accent-violet);
+            box-shadow: 0 0 15px rgba(124, 77, 255, 0.4);
+            transform: scale(1.08) !important;
+            animation-play-state: paused;
+        }
+        @keyframes bobTag {
+            from { transform: translateY(-10px); }
+            to { transform: translateY(10px); }
+        }
+
+        /* --- Mood Preview Panel --- */
+        .mood-panel-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: transparent;
+            pointer-events: none;
+            z-index: 200;
+        }
+        .mood-panel-overlay.active { pointer-events: auto; }
+        
+        .mood-panel {
+            position: absolute;
+            top: 0; right: 0;
+            width: 320px; height: 100%;
+            background: var(--surface-blur);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(255,255,255,0.05);
+            padding: 40px 24px;
+            transform: translateX(100%);
+            transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            overflow-y: auto;
+            pointer-events: auto;
+        }
+        .mood-panel-overlay.active .mood-panel {
+            transform: translateX(0);
+        }
+        .mood-panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .mood-panel-title {
+            font-family: var(--font-display);
+            font-size: 28px;
+            font-style: italic;
+            color: var(--text-primary);
+        }
+        .close-panel-btn {
+            background: none; border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            line-height: 1;
+            transition: transform 0.3s, color 0.3s;
+        }
+        .close-panel-btn:hover {
+            color: var(--text-primary);
+            transform: rotate(90deg);
+        }
+        .panel-card {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.03);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex; flex-direction: column; gap: 15px;
+            opacity: 0; transform: translateY(10px);
+            transition: opacity 0.4s, transform 0.4s;
+        }
+        .mood-panel-overlay.active .panel-card {
+            opacity: 1; transform: translateY(0);
+        }
+        .panel-card:nth-child(2) { transition-delay: 0.1s; }
+        .panel-card:nth-child(3) { transition-delay: 0.2s; }
+        .panel-card:nth-child(4) { transition-delay: 0.3s; }
+        
+        .panel-card-text {
+            font-family: var(--font-quote);
+            font-size: 14px;
+            font-style: italic;
+            line-height: 1.6;
+            color: var(--text-primary);
+        }
+
+        /* Flash overlay */
+        #flash-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: white;
+            z-index: 9999;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.08s;
+        }
+        #flash-overlay.flash {
+            opacity: 1; pointer-events: auto;
+        }
+
+
+        /* --- Old Styles for Feed, Express, Archive (adapted for canvas bg) --- */
+        #feed, #express, #archive {
+            padding-top: 100px;
+            max-width: 1200px; margin: 0 auto; padding-bottom: 4rem;
+        }
+        .filter-bar {
+            display: flex; gap: 1rem; overflow-x: auto; padding-bottom: 1rem; margin-bottom: 3rem; scrollbar-width: none;
+        }
+        .filter-bar::-webkit-scrollbar { display: none; }
+        .mood-pill {
+            background: rgba(17, 17, 24, 0.8); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.05); color: var(--text-secondary);
+            padding: 0.5rem 1.2rem; border-radius: 20px; white-space: nowrap; transition: all 0.3s; font-size: 0.9rem;
+        }
+        .mood-pill:hover, .mood-pill.active {
+            color: var(--text-primary); border-color: var(--accent-primary); transform: scale(1.05); box-shadow: 0 0 15px var(--glow-violet);
+        }
+        .masonry { column-count: 3; column-gap: 2rem; }
+        @media (max-width: 900px) { .masonry { column-count: 2; } }
+        @media (max-width: 600px) { .masonry { column-count: 1; } }
+        
+        .card {
+            background: rgba(17, 17, 24, 0.85); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.03); border-radius: 12px; padding: 2rem; margin-bottom: 2rem; break-inside: avoid;
+            position: relative; transition: transform 0.4s ease, box-shadow 0.4s ease, border-color 0.4s ease;
+            display: flex; flex-direction: column; gap: 1.5rem; opacity: 1;
+        }
+        .card.fade-out { opacity: 0; transform: scale(0.95); }
+        .card:hover {
+            transform: translateY(-4px); box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px var(--glow-violet); border-color: rgba(124, 77, 255, 0.3);
+        }
+        .card-text { font-family: var(--font-quote); font-style: italic; font-size: 1.2rem; line-height: 1.6; }
+        .card-photo { width: 100%; border-radius: 8px; object-fit: cover; display: none; }
+        .card.has-photo .card-photo { display: block; }
+        .card-footer { display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto; }
+        .card-tag { font-size: 0.75rem; color: var(--accent-rose); text-transform: uppercase; letter-spacing: 1px; }
+        
+        .felt-btn { background: none; border: none; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; font-family: var(--font-body); position: relative; transition: color 0.3s; }
+        .felt-btn:hover { color: var(--text-primary); }
+        .felt-btn.active { color: var(--accent-primary); }
+        .felt-icon { font-size: 1rem; }
+        .ripple { position: absolute; border-radius: 50%; background: var(--accent-primary); transform: scale(0); animation: rippleAnim 0.6s linear; pointer-events: none; }
+        @keyframes rippleAnim { to { transform: scale(4); opacity: 0; } }
+
+        /* Express */
+        #express { display: flex; gap: 4rem; }
+        @media (max-width: 900px) { #express { flex-direction: column; } }
+        .preview-pane, .form-pane { flex: 1; display: flex; flex-direction: column; }
+        .preview-pane { justify-content: center; align-items: center; position: sticky; top: 100px; height: fit-content; }
+        @media (max-width: 900px) { .preview-pane { position: static; } }
+        .preview-label { font-family: var(--font-display); font-style: italic; color: var(--text-secondary); margin-bottom: 2rem; font-size: 24px;}
+        .form-pane { gap: 2rem; }
+        .input-group textarea { width: 100%; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-quote); font-style: italic; font-size: 1.5rem; line-height: 1.5; resize: none; outline: none; min-height: 150px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem; transition: border-color 0.3s; }
+        .input-group textarea:focus { border-color: var(--accent-primary); }
+        .upload-zone { border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; padding: 3rem 2rem; text-align: center; transition: all 0.3s; color: var(--text-secondary); background: rgba(17,17,24,0.5); backdrop-filter: blur(5px);}
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent-rose); background: rgba(196, 127, 160, 0.1); }
+        .mood-select-grid { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+        .submit-btn { background: var(--text-primary); color: var(--bg-color); border: none; padding: 1.2rem; border-radius: 30px; font-size: 1rem; font-weight: 500; margin-top: 2rem; transition: all 0.3s; position: relative; overflow: hidden; }
+        .submit-btn:hover { background: #fff; box-shadow: 0 0 20px rgba(255,255,255,0.2); }
+        .submit-btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent); transition: left 0.6s ease; }
+        .submit-btn:hover::before { left: 200%; }
+        .floating-away { animation: floatAway 1.5s cubic-bezier(0.25, 0.8, 0.25, 1) forwards !important; }
+        @keyframes floatAway { to { transform: translateY(-100px) scale(0.9); opacity: 0; filter: blur(5px); } }
+
+        /* Archive */
+        #archive { max-width: 800px; }
+        .archive-header { text-align: center; margin-bottom: 3rem; }
+        .archive-header h2 { font-family: var(--font-display); font-style: italic; font-weight: 400; font-size: 2.5rem; }
+        .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1rem; margin-bottom: 4rem; }
+        .cal-day { aspect-ratio: 1; display: flex; justify-content: center; align-items: center; background: rgba(17,17,24,0.8); backdrop-filter: blur(5px); border-radius: 8px; color: var(--text-secondary); font-size: 0.9rem; position: relative; transition: transform 0.2s, background 0.2s; }
+        .cal-day:hover { background: rgba(255,255,255,0.1); transform: scale(1.05); }
+        .cal-day.has-entry::after { content: ''; position: absolute; bottom: 6px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent-rose); box-shadow: 0 0 5px var(--accent-rose); }
+        .timeline { display: flex; flex-direction: column; gap: 2rem; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 2rem; margin-left: 1rem; }
+        .timeline-item { position: relative; }
+        .timeline-item::before { content: ''; position: absolute; left: -2.35rem; top: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-primary); box-shadow: 0 0 10px var(--glow-violet); }
+        .timeline-date { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.5rem; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,10,15,0.8); backdrop-filter: blur(8px); z-index: 1000; display: none; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; }
+        .modal-overlay.active { display: flex; opacity: 1; }
+        .modal-content { transform: scale(0.95); transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); max-width: 500px; width: 90%; }
+        .modal-overlay.active .modal-content { transform: scale(1); }
+
+    </style>
+</head>
+<body>
+
+    <!-- The Galaxy -->
+    <canvas id="galaxy-canvas"></canvas>
+
+    <!-- Custom Cursor -->
+    <div id="custom-cursor"></div>
+
+    <!-- Flash Overlay for transition -->
+    <div id="flash-overlay"></div>
+
+    <nav id="main-nav">
+        <a href="#landing" class="logo nav-link" data-target="landing">unsent moments</a>
+        <div class="nav-links" id="nav-links">
+            <a href="#feed" class="nav-link" data-target="feed">feed</a>
+            <a href="#express" class="nav-link" data-target="express">express</a>
+            <a href="#archive" class="nav-link" data-target="archive">archive</a>
+        </div>
+    </nav>
+
+    <main>
+        <!-- LANDING PAGE -->
+        <section id="landing" class="page active">
+            
+            <div class="hero-container">
+                <div class="hero-line">some things</div>
+                <div class="hero-line">were never meant</div>
+                <div class="hero-line">
+                    to be sent.
+                    <div class="hero-underline"></div>
+                </div>
+                <div class="hero-tagline">write it. release it. let it drift.</div>
+            </div>
+
+            <div class="cta-container">
+                <button class="cta-btn nav-link" data-target="feed">
+                    enter the universe
+                    <div class="orbit-ring"></div>
+                    <div class="orbit-container">
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                        <div class="orbit-particle"></div>
+                    </div>
+                </button>
+            </div>
+
+            <div class="scroll-hint" id="scroll-hint">
+                <div class="chevron"></div>
+                <div class="chevron"></div>
+                <span>explore the universe</span>
+            </div>
+
+            <div class="mood-tags-container" id="mood-tags-container">
+                <!-- Tags generated via JS -->
+            </div>
+        </section>
+
+        <!-- FEED PAGE -->
+        <section id="feed" class="page">
+            <div class="filter-bar" id="filter-bar"></div>
+            <div class="masonry" id="feed-masonry"></div>
+        </section>
+
+        <!-- EXPRESS PAGE -->
+        <section id="express" class="page">
+            <div class="preview-pane">
+                <div class="preview-label">Preview</div>
+                <div class="card" id="preview-card" style="width: 100%; max-width: 400px; transform: none; box-shadow: none;">
+                    <img src="" alt="" class="card-photo" id="preview-photo">
+                    <div class="card-text" id="preview-text">To someone I never told...</div>
+                    <div class="card-footer">
+                        <div class="card-tag" id="preview-tag">mood</div>
+                        <div class="felt-btn"><span class="felt-icon">♡</span> <span class="count">0</span></div>
+                    </div>
+                </div>
+            </div>
+            <div class="form-pane">
+                <div class="input-group">
+                    <textarea id="express-input" placeholder="To someone I never told..."></textarea>
+                </div>
+                <div class="upload-zone" id="upload-zone">
+                    <div style="font-size: 2rem; margin-bottom: 1rem;">📷</div>
+                    <p>Capture what you felt today. Blur is beautiful.</p>
+                    <p style="font-size: 0.8rem; margin-top: 0.5rem; opacity: 0.6;">(Click or drag to select an abstract image)</p>
+                    <input type="file" id="file-input" style="display: none;" accept="image/*">
+                </div>
+                <div class="input-group">
+                    <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">Select your mood</p>
+                    <div class="mood-select-grid" id="mood-select"></div>
+                </div>
+                <button class="submit-btn" id="submit-btn">Release into the Universe</button>
+            </div>
+        </section>
+
+        <!-- ARCHIVE PAGE -->
+        <section id="archive" class="page">
+            <div class="archive-header">
+                <h2>My Archive</h2>
+                <p style="color: var(--text-secondary); font-style: italic; margin-top: 0.5rem;">a private collection of unsent moments</p>
+            </div>
+            <div class="calendar" id="calendar"></div>
+            <div class="timeline" id="timeline"></div>
+        </section>
+    </main>
+
+    <!-- MOOD PANEL OVERLAY -->
+    <div class="mood-panel-overlay" id="mood-panel-overlay">
+        <div class="mood-panel">
+            <div class="mood-panel-header">
+                <h3 class="mood-panel-title" id="mood-panel-title">mood</h3>
+                <button class="close-panel-btn" id="close-panel-btn">×</button>
+            </div>
+            <div id="mood-panel-cards">
+                <!-- populated by js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ARCHIVE MODAL -->
+    <div class="modal-overlay" id="archive-modal">
+        <div class="modal-content" id="modal-content-container"></div>
+    </div>
+
+    <script>
+        // -----------------------------------------------------------
+        // 1. DATA & CONSTANTS
+        // -----------------------------------------------------------
+        const landingMoods = ["soft sadness", "loud overthinking", "quiet healing", "main character loneliness", "nostalgic 2am", "almost okay"];
+        const allMoods = [...landingMoods, "numb", "bittersweet", "anger i can't explain", "something like love"];
+        
+        const canvasFragmentsText = [
+            "I wanted to tell you—", "you were my—", "I never said this but", 
+            "I hope you know", "it still hurts", "I'm sorry", "I miss who we were", 
+            "you'd be proud", "I should have stayed", "I forgive you", 
+            "none of it was your fault", "I think about you still", 
+            "you made me feel seen", "I wish I'd said it sooner"
+        ];
+
+        const panelPreviewMessages = [
+            "I wanted to call you when I saw that movie but I remembered you don't pick up anymore.",
+            "I hope you're eating well. I still think about that sometimes.",
+            "You were the only person who made silence feel safe."
+        ];
+
+        // -----------------------------------------------------------
+        // 2. CUSTOM CURSOR
+        // -----------------------------------------------------------
+        const cursor = document.getElementById('custom-cursor');
+        let mouseX = window.innerWidth / 2;
+        let mouseY = window.innerHeight / 2;
+        let cursorX = mouseX;
+        let cursorY = mouseY;
+        
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+        });
+
+        function animateCursor() {
+            // Easing lag effect
+            cursorX += (mouseX - cursorX) * 0.15;
+            cursorY += (mouseY - cursorY) * 0.15;
+            cursor.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+            requestAnimationFrame(animateCursor);
+        }
+        animateCursor();
+
+        // Hover states for cursor
+        document.querySelectorAll('a, button, .mood-tag, .upload-zone').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+        });
+
+        // -----------------------------------------------------------
+        // 3. CANVAS ENGINE (THE GALAXY)
+        // -----------------------------------------------------------
+        const canvas = document.getElementById('galaxy-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let isMobile = false;
+
+        const stars = [];
+        const nebulas = [];
+        const fragments = [];
+        const shootingStars = [];
+        const ripples = [];
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            isMobile = width < 768;
+            initGalaxy();
+        }
+        window.addEventListener('resize', resize);
+
+        class Star {
+            constructor() {
+                this.reset();
+            }
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.baseX = this.x;
+                this.baseY = this.y;
+                
+                // 70% tiny, 20% small, 10% medium
+                const r = Math.random();
+                if(r < 0.7) this.size = Math.random() * 0.5 + 0.5;
+                else if(r < 0.9) this.size = Math.random() * 0.5 + 1.0;
+                else this.size = Math.random() * 1.0 + 1.5;
+
+                // Color 60% white, 20% cream, 15% blue, 5% violet
+                const c = Math.random();
+                if(c < 0.6) this.color = '#ffffff';
+                else if(c < 0.8) this.color = '#fff8e7';
+                else if(c < 0.95) this.color = '#c8d8ff';
+                else this.color = '#b89fe0';
+
+                this.baseOpacity = Math.random() * 0.7 + 0.3;
+                this.twinkleFreq = Math.random() * 1.2 + 0.3; // 0.3 - 1.5Hz
+                this.phase = Math.random() * Math.PI * 2;
+                
+                this.scatterX = 0;
+                this.scatterY = 0;
+            }
+            update(time) {
+                // Twinkle
+                this.opacity = this.baseOpacity * (0.5 + 0.5 * Math.sin(time * this.twinkleFreq + this.phase));
+                
+                // Return from scatter
+                this.scatterX *= 0.95;
+                this.scatterY *= 0.95;
+                this.x = this.baseX + this.scatterX;
+                this.y = this.baseY + this.scatterY;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class Nebula {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.radius = Math.random() * 150 + 150;
+                
+                const colors = [
+                    {r: 59, g: 31, b: 110, baseA: 0.08}, // deep violet
+                    {r: 110, g: 31, b: 59, baseA: 0.06}, // midnight rose
+                    {r: 31, g: 47, b: 110, baseA: 0.08}  // ink blue
+                ];
+                this.c = colors[Math.floor(Math.random() * colors.length)];
+                
+                this.dx = (Math.random() - 0.5) * 0.1;
+                this.dy = (Math.random() - 0.5) * 0.1;
+                this.targetOpacity = this.c.baseA;
+                this.currentOpacity = this.c.baseA;
+            }
+            update(mx, my) {
+                this.x += this.dx;
+                this.y += this.dy;
+                if(this.x < -this.radius) this.x = width + this.radius;
+                if(this.x > width + this.radius) this.x = -this.radius;
+                if(this.y < -this.radius) this.y = height + this.radius;
+                if(this.y > height + this.radius) this.y = -this.radius;
+
+                // Hover proximity
+                const dist = Math.hypot(this.x - mx, this.y - my);
+                if(dist < this.radius * 1.5) {
+                    this.targetOpacity = Math.min(0.18, this.c.baseA * 2.5);
+                } else {
+                    this.targetOpacity = this.c.baseA;
+                }
+                this.currentOpacity += (this.targetOpacity - this.currentOpacity) * 0.02;
+            }
+            draw(ctx) {
+                ctx.globalAlpha = 1;
+                const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                grad.addColorStop(0, `rgba(${this.c.r}, ${this.c.g}, ${this.c.b}, ${this.currentOpacity})`);
+                grad.addColorStop(1, `rgba(${this.c.r}, ${this.c.g}, ${this.c.b}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        class TextFragment {
+            constructor() {
+                this.reset();
+                this.y = Math.random() * height; // initial spread
+            }
+            reset() {
+                this.text = canvasFragmentsText[Math.floor(Math.random() * canvasFragmentsText.length)];
+                this.x = Math.random() * (width - 100) + 50;
+                this.y = height + 50;
+                this.size = Math.random() * 4 + 10; // 10-14px
+                this.baseOpacity = Math.random() * 0.15 + 0.10; // 10-25%
+                this.opacity = this.baseOpacity;
+                this.targetOpacity = this.baseOpacity;
+                this.dy = -(Math.random() * 0.2 + 0.1); // drift upward 0.1-0.3px
+                this.dx = (Math.random() - 0.5) * 0.1;
+                this.scale = 1;
+                this.targetScale = 1;
+                this.clicked = false;
+            }
+            update(mx, my) {
+                this.x += this.dx;
+                this.y += this.dy;
+
+                if(!this.clicked) {
+                    const dist = Math.hypot(this.x + 40 - mx, this.y - my); // approx center
+                    if(dist < 80) {
+                        this.targetOpacity = 0.6;
+                        this.targetScale = 1.05;
+                    } else {
+                        this.targetOpacity = this.baseOpacity;
+                        this.targetScale = 1;
+                    }
+                }
+
+                this.opacity += (this.targetOpacity - this.opacity) * 0.05;
+                this.scale += (this.targetScale - this.scale) * 0.05;
+
+                if(this.y < -50 || (this.clicked && this.opacity <= 0.01)) {
+                    this.reset();
+                }
+            }
+            draw(ctx) {
+                ctx.globalAlpha = this.opacity;
+                ctx.fillStyle = '#ffffff';
+                ctx.font = `italic ${this.size * this.scale}px 'Lora'`;
+                ctx.fillText(this.text, this.x, this.y);
+            }
+            checkClick(mx, my) {
+                const dist = Math.hypot(this.x + 40 - mx, this.y - my);
+                if(dist < 80 && !this.clicked) {
+                    this.clicked = true;
+                    this.dy = -1.5; // Float up faster
+                    this.targetOpacity = 0; // Fade out
+                    this.targetScale = 1.2;
+                }
+            }
+        }
+
+        class ShootingStar {
+            constructor() {
+                this.active = false;
+                this.particles = [];
+            }
+            spawn() {
+                this.active = true;
+                this.x = Math.random() * width;
+                this.y = Math.random() * height * 0.5;
+                this.angle = Math.PI / 4 + (Math.random() - 0.5) * 0.5; // roughly diagonal down-right
+                this.speed = Math.random() * 15 + 15;
+                this.len = Math.random() * 60 + 80;
+                this.opacity = 1;
+                this.particles = [];
+                this.life = 600; // ms
+                this.birth = performance.now();
+                this.trail = Math.random() < 0.2;
+                this.trailOpacity = 0;
+            }
+            update(now) {
+                if(!this.active) return;
+                
+                const age = now - this.birth;
+                if(age > this.life) {
+                    // Burst particles
+                    if(this.particles.length === 0 && this.opacity > 0) {
+                        for(let i=0; i<8; i++) {
+                            this.particles.push({
+                                x: this.x, y: this.y,
+                                dx: (Math.random()-0.5)*4, dy: (Math.random()-0.5)*4,
+                                life: 1,
+                                decay: Math.random() * 0.03 + 0.02
+                            });
+                        }
+                    }
+                    this.opacity -= 0.05;
+                    
+                    if(this.trail) this.trailOpacity = 0.2;
+                    else if (this.particles.length === 0) this.active = false;
+                } else {
+                    this.x += Math.cos(this.angle) * this.speed;
+                    this.y += Math.sin(this.angle) * this.speed;
+                }
+
+                // Update particles
+                for(let i=this.particles.length-1; i>=0; i--) {
+                    let p = this.particles[i];
+                    p.x += p.dx; p.y += p.dy;
+                    p.life -= p.decay;
+                    if(p.life <= 0) this.particles.splice(i, 1);
+                }
+
+                if(this.trail && this.trailOpacity > 0) {
+                    this.trailOpacity -= 0.002;
+                    if(this.trailOpacity <= 0) this.active = false;
+                }
+            }
+            draw(ctx) {
+                if(!this.active) return;
+                
+                if(this.opacity > 0) {
+                    ctx.globalAlpha = this.opacity;
+                    const endX = this.x - Math.cos(this.angle) * this.len;
+                    const endY = this.y - Math.sin(this.angle) * this.len;
+                    
+                    const grad = ctx.createLinearGradient(this.x, this.y, endX, endY);
+                    grad.addColorStop(0, '#ffffff');
+                    grad.addColorStop(1, 'rgba(255,255,255,0)');
+                    
+                    ctx.strokeStyle = grad;
+                    ctx.lineWidth = 2;
+                    ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(this.x, this.y);
+                    ctx.lineTo(endX, endY);
+                    ctx.stroke();
+                }
+
+                // Draw trail
+                if(this.trail && this.trailOpacity > 0) {
+                     ctx.globalAlpha = this.trailOpacity;
+                     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                     ctx.lineWidth = 1;
+                     ctx.beginPath();
+                     ctx.moveTo(this.x, this.y);
+                     ctx.lineTo(this.x - Math.cos(this.angle) * this.len * 2, this.y - Math.sin(this.angle) * this.len * 2);
+                     ctx.stroke();
+                }
+
+                // Draw particles
+                ctx.fillStyle = '#ffffff';
+                this.particles.forEach(p => {
+                    ctx.globalAlpha = p.life;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 1, 0, Math.PI*2);
+                    ctx.fill();
+                });
+            }
+        }
+
+        class Ripple {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.r = 0;
+                this.maxR = 120;
+                this.opacity = 1;
+                this.active = true;
+                
+                // Scatter nearby stars
+                stars.forEach(s => {
+                    const dist = Math.hypot(s.x - x, s.y - y);
+                    if(dist < this.maxR) {
+                        const angle = Math.atan2(s.y - y, s.x - x);
+                        const force = (this.maxR - dist) / this.maxR * 2;
+                        s.scatterX = Math.cos(angle) * force * 5;
+                        s.scatterY = Math.sin(angle) * force * 5;
+                    }
+                });
+
+                // Pulse text fragments
+                fragments.forEach(f => {
+                    const dist = Math.hypot(f.x - x, f.y - y);
+                    if(dist < this.maxR) f.targetOpacity = 0.8;
+                });
+            }
+            update() {
+                this.r += (this.maxR - this.r) * 0.1;
+                this.opacity -= 0.02;
+                if(this.opacity <= 0) this.active = false;
+            }
+            draw(ctx) {
+                if(!this.active) return;
+                ctx.globalAlpha = this.opacity;
+                ctx.strokeStyle = '#7c4dff';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+                ctx.stroke();
+            }
+        }
+
+        function initGalaxy() {
+            stars.length = 0;
+            const starCount = isMobile ? 400 : 800;
+            for(let i=0; i<starCount; i++) stars.push(new Star());
+
+            nebulas.length = 0;
+            for(let i=0; i<5; i++) nebulas.push(new Nebula());
+
+            fragments.length = 0;
+            for(let i=0; i<14; i++) fragments.push(new TextFragment());
+            
+            shootingStars.length = 0;
+            shootingStars.push(new ShootingStar());
+        }
+
+        let lastTime = 0;
+        let lastShootingStar = 0;
+
+        function render(time) {
+            requestAnimationFrame(render);
+            const now = performance.now();
+            const timeSec = time * 0.001;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 1. Nebulas
+            nebulas.forEach(n => { n.update(mouseX, mouseY); n.draw(ctx); });
+
+            // 2. Constellations
+            if(!isMobile) {
+                ctx.lineWidth = 0.3;
+                for(let i=0; i<stars.length; i++) {
+                    const s = stars[i];
+                    const distToMouse = Math.hypot(s.x - mouseX, s.y - mouseY);
+                    if(distToMouse < 120) {
+                        for(let j=i+1; j<stars.length; j++) {
+                            const s2 = stars[j];
+                            if(Math.hypot(s2.x - mouseX, s2.y - mouseY) < 120) {
+                                const d = Math.hypot(s.x - s2.x, s.y - s2.y);
+                                if(d < 60) {
+                                    const opac = 0.08 * (1 - distToMouse/120);
+                                    ctx.globalAlpha = opac;
+                                    ctx.strokeStyle = '#ffffff';
+                                    ctx.beginPath();
+                                    ctx.moveTo(s.x, s.y);
+                                    ctx.lineTo(s2.x, s2.y);
+                                    ctx.stroke();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. Stars
+            stars.forEach(s => { s.update(timeSec); s.draw(ctx); });
+
+            // 4. Text Fragments
+            fragments.forEach(f => { f.update(mouseX, mouseY); f.draw(ctx); });
+
+            // 5. Shooting Stars
+            if(now - lastShootingStar > Math.random()*4000 + 4000) {
+                lastShootingStar = now;
+                if(!shootingStars[0].active) shootingStars[0].spawn();
+            }
+            shootingStars.forEach(ss => { ss.update(now); ss.draw(ctx); });
+
+            // 6. Ripples
+            for(let i=ripples.length-1; i>=0; i--) {
+                const r = ripples[i];
+                r.update(); r.draw(ctx);
+                if(!r.active) ripples.splice(i, 1);
+            }
+        }
+
+        window.addEventListener('click', (e) => {
+            // Ignore clicks on UI elements
+            if(e.target.tagName === 'A' || e.target.tagName === 'BUTTON' || e.target.closest('.mood-tag') || e.target.closest('.mood-panel')) return;
+            
+            ripples.push(new Ripple(e.clientX, e.clientY));
+            fragments.forEach(f => f.checkClick(e.clientX, e.clientY));
+        });
+
+        resize();
+        requestAnimationFrame(render);
+
+
+        // -----------------------------------------------------------
+        // 4. LANDING PAGE UI LOGIC
+        // -----------------------------------------------------------
+        
+        // Scroll Hint
+        window.addEventListener('scroll', () => {
+            const hint = document.getElementById('scroll-hint');
+            const nav = document.getElementById('main-nav');
+            if(window.scrollY > 50) {
+                if(hint) hint.classList.add('hidden');
+                nav.classList.add('scrolled');
+            } else {
+                if(hint) hint.classList.remove('hidden');
+                nav.classList.remove('scrolled');
+            }
+        });
+
+        // Floating Mood Tags Generation
+        const tagsContainer = document.getElementById('mood-tags-container');
+        landingMoods.forEach((mood, i) => {
+            const tag = document.createElement('div');
+            tag.className = 'mood-tag';
+            tag.textContent = mood;
+            // Position randomly in bottom half
+            tag.style.left = (10 + Math.random() * 70) + '%';
+            tag.style.top = (60 + Math.random() * 30) + '%';
+            tag.style.animationDelay = (Math.random() * -4) + 's'; // random phase
+            
+            tag.addEventListener('mouseenter', () => cursor.classList.add('hover'));
+            tag.addEventListener('mouseleave', () => cursor.classList.remove('hover'));
+            tag.addEventListener('click', () => openMoodPanel(mood));
+            
+            tagsContainer.appendChild(tag);
+        });
+
+        // Mood Panel Logic
+        const moodPanelOverlay = document.getElementById('mood-panel-overlay');
+        const moodPanelTitle = document.getElementById('mood-panel-title');
+        const moodPanelCards = document.getElementById('mood-panel-cards');
+        const closePanelBtn = document.getElementById('close-panel-btn');
+
+        function openMoodPanel(mood) {
+            moodPanelTitle.textContent = mood;
+            moodPanelCards.innerHTML = '';
+            
+            panelPreviewMessages.forEach((msg, i) => {
+                const card = document.createElement('div');
+                card.className = 'panel-card';
+                card.innerHTML = `
+                    <div class="panel-card-text">${msg}</div>
+                    <div class="felt-btn"><span class="felt-icon">♡</span> <span>${Math.floor(Math.random()*100)+10} felt this</span></div>
+                `;
+                moodPanelCards.appendChild(card);
+            });
+            
+            moodPanelOverlay.classList.add('active');
+        }
+
+        closePanelBtn.addEventListener('click', () => {
+            moodPanelOverlay.classList.remove('active');
+        });
+        moodPanelOverlay.addEventListener('click', (e) => {
+            if(e.target === moodPanelOverlay) moodPanelOverlay.classList.remove('active');
+        });
+
+
+        // -----------------------------------------------------------
+        // 5. NAVIGATION & SPA LOGIC
+        // -----------------------------------------------------------
+        const pages = document.querySelectorAll('.page');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const flashOverlay = document.getElementById('flash-overlay');
+
+        function navigateTo(targetId, fromCTA = false) {
+            if(fromCTA) {
+                // Flash effect
+                flashOverlay.classList.add('flash');
+                setTimeout(() => {
+                    switchPage(targetId);
+                    flashOverlay.classList.remove('flash');
+                }, 100);
+            } else {
+                switchPage(targetId);
+            }
+        }
+
+        function switchPage(targetId) {
+            navLinks.forEach(link => {
+                if (link.dataset.target === targetId) link.classList.add('active');
+                else link.classList.remove('active');
+            });
+
+            pages.forEach(page => {
+                if (page.classList.contains('active')) {
+                    page.classList.remove('visible');
+                    setTimeout(() => {
+                        page.classList.remove('active');
+                        const newPage = document.getElementById(targetId);
+                        newPage.classList.add('active');
+                        setTimeout(() => newPage.classList.add('visible'), 50);
+                    }, 300); // quick fade
+                }
+            });
+
+            if (targetId === 'feed' && !window.feedRendered) {
+                renderFeed('all');
+                window.feedRendered = true;
+            }
+        }
+
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetId = link.dataset.target;
+                const isCTA = link.classList.contains('cta-btn');
+                navigateTo(targetId, isCTA);
+            });
+        });
+
+        // Initialize
+        setTimeout(() => document.getElementById('landing').classList.add('visible'), 100);
+
+        // -----------------------------------------------------------
+        // 6. FEED / EXPRESS / ARCHIVE MOCK LOGIC (Adapted)
+        // -----------------------------------------------------------
+        // Generate abstract image data URI
+        function generateAbstractImage() {
+            const cvs = document.createElement('canvas'); cvs.width = 400; cvs.height = 300;
+            const ctx = cvs.getContext('2d');
+            const grd = ctx.createLinearGradient(0, 0, 400, 300);
+            grd.addColorStop(0, `rgb(${Math.random()*50},${Math.random()*30},${Math.random()*60+20})`);
+            grd.addColorStop(1, `rgb(${Math.random()*80+40},${Math.random()*40+20},${Math.random()*80+40})`);
+            ctx.fillStyle = grd; ctx.fillRect(0, 0, 400, 300);
+            ctx.filter = 'blur(10px)'; ctx.drawImage(cvs, 0, 0);
+            return cvs.toDataURL();
+        }
+
+        const sampleCards = Array.from({length: 12}, (_, i) => ({
+            id: i, text: panelPreviewMessages[i%3], mood: allMoods[Math.floor(Math.random()*allMoods.length)],
+            photo: Math.random() > 0.6 ? generateAbstractImage() : null, feltCount: Math.floor(Math.random()*500)
+        }));
+
+        const feedMasonry = document.getElementById('feed-masonry');
+        const filterBar = document.getElementById('filter-bar');
+        
+        ['all', ...allMoods].forEach(mood => {
+            const pill = document.createElement('div');
+            pill.className = `mood-pill ${mood === 'all' ? 'active' : ''}`; pill.textContent = mood;
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.mood-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active'); renderFeed(mood);
+            });
+            filterBar.appendChild(pill);
+        });
+
+        function renderFeed(filterMood) {
+            Array.from(feedMasonry.children).forEach(c => c.classList.add('fade-out'));
+            setTimeout(() => {
+                feedMasonry.innerHTML = '';
+                const filtered = filterMood === 'all' ? sampleCards : sampleCards.filter(c => c.mood === filterMood);
+                filtered.forEach((card, index) => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <div class="card ${card.photo ? 'has-photo' : ''}">
+                            ${card.photo ? `<img src="${card.photo}" class="card-photo">` : ''}
+                            <div class="card-text">${card.text}</div>
+                            <div class="card-footer">
+                                <div class="card-tag">${card.mood}</div>
+                                <button class="felt-btn" onclick="triggerFelt(this)"><span class="felt-icon">♡</span><span class="count">${card.feltCount}</span></button>
+                            </div>
+                        </div>`;
+                    const cardEl = div.firstElementChild; cardEl.classList.add('fade-out');
+                    feedMasonry.appendChild(cardEl);
+                    setTimeout(() => cardEl.classList.remove('fade-out'), 50 + index*50);
+                });
+            }, 300);
+        }
+
+        window.triggerFelt = function(btn) {
+            if(btn.classList.contains('active')) return;
+            btn.classList.add('active'); btn.querySelector('.felt-icon').textContent = '♥';
+            let countSpan = btn.querySelector('.count'); countSpan.textContent = parseInt(countSpan.textContent) + 1;
+        };
+
+        // Populate archive simple
+        const cal = document.getElementById('calendar');
+        for(let i=1; i<=30; i++) {
+            const day = document.createElement('div'); day.className = 'cal-day'; day.textContent = i;
+            if(i%7===0) day.classList.add('has-entry');
+            cal.appendChild(day);
+        }
+
+    </script>
+</body>
+</html>
